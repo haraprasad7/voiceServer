@@ -1,0 +1,35 @@
+{
+  "name": "voiceserver",
+  "version": "1.0.0",
+  "description": "voice server for hand cricket application",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haraprasad7/voiceServer.git"
+  },
+  "keywords": [
+    "SFU",
+    "voice",
+    "server",
+    "\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D",
+    "voice",
+    "server",
+    "media",
+    "soup",
+    "web",
+    "rtc"
+  ],
+  "author": "haraprasad",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/haraprasad7/voiceServer/issues"
+  },
+  "homepage": "https://github.com/haraprasad7/voiceServer#readme",
+  "dependencies": {
+    "mediasoup": "^3.13.18",
+    "socket-io": "^1.0.0"
+  }
+}
