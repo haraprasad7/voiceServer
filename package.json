@@ -30,6 +30,6 @@
   "homepage": "https://github.com/haraprasad7/voiceServer#readme",
   "dependencies": {
     "mediasoup": "^3.13.18",
-    "socket-io": "^1.0.0"
+    "socket.io": "^4.7.4"
   }
 }
