@@ -8,6 +8,7 @@ const { initializeRoom, getRouter, joinPeer2Room,
   getConsumer,
   getProducerList,
   addToProducerList} = require("./utility/roomData");
+const { logItOnConsole } = require("./utility/logging");
 
 const io = new Server({ cors: {
     origin: "http://localhost:4200",
@@ -45,10 +46,15 @@ const logTags = [
         // 'simulcast',
         // 'svc'
       ];
+const PORT = 3001;
+const WEBRTC_TRANS_PROTOCOL= "tcp";
+const IP = '0.0.0.0';
+const ANNOUNCED_IP = '127.0.0.1';
+const CONNECTION_SUCCESS =  "Connected with Voice server succesfully";
 let worker;
 
 mediasoup.observer.on("newworker", (worker) => {
-  console.log("new worker created [pid:%d]", worker.pid);
+  logItOnConsole("[INFO] new worker created [WRID] " + worker.pid);
 });
 
 createWorker = async ()=> {
@@ -57,25 +63,24 @@ createWorker = async ()=> {
     logTags: logTags,
   });
   worker.on('died', error => {
-    console.error('mediasoup worker has died');
-    console.log(error);
+    logItOnConsole(error);
+    logItOnConsole("[EROR] worker died shutting down server");
     setTimeout(() => process.exit(1), 2000);
   });
   worker.observer.on("newrouter", (router) => {
-    console.log("new router created [id:%s]", router.id);
+    logItOnConsole("[INFO] new router created [RTID] " + router.id);
   });
   worker.observer.on("newwebrtcserverr", (webrtcServer) => {
-    console.log("new webRTC server created ");
+    logItOnConsole("[INFO] new webRTC server created ");
   });
-
   return worker;
 }
 
 const createRouter = async () => {
   let routerLocal = await worker.createRouter({ mediaCodecs });
-  console.log("Router has been created");
+  logItOnConsole("[INFO] Router has been created");
   routerLocal.observer.on("newtransport", (transport) => {
-    console.log("new transport created [id:%s]", transport.id);
+    logItOnConsole("[INFO] new transport created [TRID] " +  transport.id);
   });
   return routerLocal;
 }
@@ -84,43 +89,42 @@ createWebRtcTransport = async (roomID) => {
   const webRtcTransport_options = {
     listenInfos: [
       {
-        protocol:"tcp",
-        ip: '0.0.0.0',
-        announcedAddress:'127.0.0.1' 
+        protocol:WEBRTC_TRANS_PROTOCOL,
+        ip: IP,
+        announcedAddress:ANNOUNCED_IP 
       }
     ],
   }
   router = getRouter(roomID);
   let transport = await router.createWebRtcTransport(webRtcTransport_options);
-  console.log(`transport id: ${transport.id}`);
+  logItOnConsole(`[INFO] transport id [TRID]: ${transport.id}`);
 
   transport.on('dtlsstatechange', dtlsState => {
-    console.log("dtlsstatechange event to %s", dtlsState);
+    logItOnConsole("[INFO] [DTLS] dtlsstatechange event to %s", dtlsState);
     if (dtlsState === 'closed') {
-      console.log("closing transport");
+      logItOnConsole("[INFO] [DTLS] closing transport");
       transport.close();
     }
   });
   transport.on("icestatechange", (iceState) => {
-    console.log("ICE state changed to %s", iceState);
+    logItOnConsole("[INFO] [ICES] ICE state changed to %s", iceState);
   });
   transport.on('close', () => {
-    console.log('transport closed on close event');
+    logItOnConsole('[INFO] transport closed on close event');
   });
   transport.observer.on("newproducer", (producer) => {
-    console.log("new producer created [id:%s]", producer.id);
+    logItOnConsole("[INFO] new producer created  [PROD] [PRID] " + producer.id);
   });
   transport.observer.on("newconsumer", (consumer) => {
-    console.log("new consumer created [id:%s]", consumer.id);
+    logItOnConsole("[INFO] new consumer created [CONS] [CNID] " + consumer.id);
   });
-
   return transport;
 }
 
   io.on("connection", socket => {
     let peerID;
-    console.log("A new user has joined socket id : ",socket.id);
-    socket.emit("connection-success", "Connected with Voice server succesfully");
+    logItOnConsole("[INFO] A new user has joined socket id [SKID] : ",socket.id);
+    socket.emit("connection-success",CONNECTION_SUCCESS);
 
     socket.on("create-voice-room", async ({roomID, username}) => {
       let router  = await createRouter();
@@ -129,6 +133,7 @@ createWebRtcTransport = async (roomID) => {
       joinPeer2Room(roomID, peerID, username);
       socket.join(roomID);
       socket.emit("rtp-capabilities-router", (router.rtpCapabilities));
+      logItOnConsole(`[INFO] voice room created [RMID] ${roomID} [USER] ${username}`);
     });
 
     socket.on("join-voice-room", ({roomID, username}) => {
@@ -137,6 +142,7 @@ createWebRtcTransport = async (roomID) => {
       joinPeer2Room(roomID, peerID, username);
       socket.join(roomID);
       socket.emit("rtp-capabilities-router", (router.rtpCapabilities));
+      logItOnConsole(`[INFO] joined voice room [RMID] ${roomID} [USER] ${username}`);
     });
 
     socket.on("create-webrtc-transport", async ({roomID, username}) => {
@@ -155,20 +161,20 @@ createWebRtcTransport = async (roomID) => {
         dtlsParameters: transportConsumer.dtlsParameters,
       }
       addTransports(roomID, username, transport, transportConsumer);
-      console.log("created web rtc transport ");
+      logItOnConsole(`[INFO] transports created [RMID] ${roomID} [USER] ${username}`);
       socket.emit("transport-params", ({params, paramsConsumer}));
     });
 
     socket.on("transport-connect",  async ({ dtlsParameters, roomID, username}) => {
       let transport = getSendTransport(roomID, username);
       await transport.connect({dtlsParameters});
-      console.log("transport producer connect done on dtls params");
+      logItOnConsole(`[INFO] [DTLS] producer transport connect [RMID] ${roomID} [USER] ${username}`);
     });
 
     socket.on("transport-consumer-connect",  async ({ dtlsParameters, roomID, username}) => {
       let transport = getRecvTransport(roomID, username);
       await transport.connect({dtlsParameters});
-      console.log("transport reciever connect done on dtls params");
+      logItOnConsole(`[INFO] [DTLS] producer transport connect [RMID] ${roomID} [USER] ${username}`);
     });
 
     socket.on("transport-produce", async ({kind, rtpParameters, roomID, username}) => {
@@ -180,48 +186,42 @@ createWebRtcTransport = async (roomID) => {
       let producerList = [...getProducerList(roomID)];
       addToProducerList(roomID, producer.id);
       addProducer(roomID, username, producer);
-      console.log('Producer added. ID: ', producer.id, producer.kind)
+      logItOnConsole(`[INFO] producer created [PROD] ${producer.id} [RMID] ${roomID} [USER] ${username}`);
       producer.on('transportclose', () => {
-        console.log('transport for this producer CLOSED ' + username);
+        logItOnConsole('[INFO] transport for this producer CLOSED [USER] ' + username);
         producer.close()
       });
       producer.on("trace", (trace) => {
-        console.log("trace data")
-        console.log(trace);
+        logItOnConsole("[INFO] [TRAC] trace data")
       });
       socket.emit("prodcuer-data", ({id:producer.id, producerList}));
       socket.to(roomID).emit("new-producer", (producer.id));
+      logItOnConsole(`[INFO] producer list sent [PROD]` + JSON.stringify(producerList) +
+       `[RMID] ${roomID} [USER] ${username}`);
     });
 
     socket.on("consume",  async ({ rtpCapabilities, roomID, username, producerID}) => {
-      console.log("inisde consume");
       let router = getRouter(roomID);
-      console.log("room", roomID, router, username, producerID);
-      console.log("boolean",router.canConsume({
-        producerId: producerID,
-        rtpCapabilities
-      }));
       if (router.canConsume({
         producerId: producerID,
         rtpCapabilities
       })) {
-        console.log("yes router can consume. Producer id : ", producerID);
         let transport  = getRecvTransport(roomID, username);
         let consumer = await transport.consume({
           producerId: producerID,
           rtpCapabilities,
           paused: true,
         });
-        console.log("consumer created");
+        logItOnConsole(`[INFO] consumer created [CONS] ${consumer.id} [RMID] ${roomID} [USER] ${username}`);
         addConsumer(roomID, username, consumer);
         consumer.on('transportclose', () => {
-          console.log('transport close from consumer: ',username);
+          logItOnConsole('[INFO] transport close from consumer [USER] ',username);
         });
         consumer.on('producerclose', () => {
-          console.log('producer of consumer closed: ', username);
+          logItOnConsole('[INFO] producer of consumer closed [USER] ', username);
         });
         consumer.on("trace", (trace) => {
-          console.log(trace);
+          logItOnConsole("[INFO] [TRAC] trace data");
         });
         const params = {
           id: consumer.id,
@@ -230,22 +230,22 @@ createWebRtcTransport = async (roomID) => {
           rtpParameters: consumer.rtpParameters,
         }
        socket.emit("consumer-params", (params));
+       logItOnConsole(`[INFO] consumer params emited [CONS] ${consumer.id} [PROD] ${producerID} [USER] ${username}`);
       }
     });
 
     socket.on('consumer-resume', async ({roomID, username, consumerID}) => {
-      console.log('consumer resume');
       consumer = getConsumer(roomID, username, consumerID)
       await consumer.resume();
+      logItOnConsole(`[INFO] consumer resumed [CONS] ${consumerID} [RMID] ${roomID} [USER] ${username}`);
     });
    
     socket.on("disconnect", reason => {
-      console.log("user disconnected..");
-      console.log("reason :" + reason);
+      logItOnConsole("[INFO] disconnect [RVAL] " + reason);
     });
   });
 
-console.log("Creating worker...");
+logItOnConsole("[INFO] Creating worker...");
 worker = createWorker();
-console.log("Listening on port: 3001....");
-io.listen(3001);
+logItOnConsole("[INFO] Listening on port: " + PORT);
+io.listen(PORT);
