@@ -11,7 +11,7 @@ const { initializeRoom, getRouter, joinPeer2Room,
 const { logItOnConsole } = require("./utility/logging");
 
 const io = new Server({ cors: {
-    origin: "http://localhost:4200",
+    origin: "*",
     methods: ["GET", "POST"]
   }});
 
@@ -49,7 +49,7 @@ const logTags = [
 const PORT = 3001;
 const WEBRTC_TRANS_PROTOCOL= "tcp";
 const IP = '0.0.0.0';
-const ANNOUNCED_IP = '127.0.0.1';
+const ANNOUNCED_IP = '192.168.144.137';
 const CONNECTION_SUCCESS =  "Connected with Voice server succesfully";
 let worker;
 
@@ -100,14 +100,14 @@ createWebRtcTransport = async (roomID) => {
   logItOnConsole(`[INFO] transport id [TRID]: ${transport.id}`);
 
   transport.on('dtlsstatechange', dtlsState => {
-    logItOnConsole("[INFO] [DTLS] dtlsstatechange event to %s", dtlsState);
+    logItOnConsole("[INFO] [DTLS] dtlsstatechange event to " + dtlsState);
     if (dtlsState === 'closed') {
       logItOnConsole("[INFO] [DTLS] closing transport");
       transport.close();
     }
   });
   transport.on("icestatechange", (iceState) => {
-    logItOnConsole("[INFO] [ICES] ICE state changed to %s", iceState);
+    logItOnConsole("[INFO] [ICES] ICE state changed to " + iceState);
   });
   transport.on('close', () => {
     logItOnConsole('[INFO] transport closed on close event');
@@ -123,7 +123,7 @@ createWebRtcTransport = async (roomID) => {
 
   io.on("connection", socket => {
     let peerID;
-    logItOnConsole("[INFO] A new user has joined socket id [SKID] : ",socket.id);
+    logItOnConsole("[INFO] A new user has joined socket id [SKID] : " + socket.id);
     socket.emit("connection-success",CONNECTION_SUCCESS);
 
     socket.on("create-voice-room", async ({roomID, username}) => {
