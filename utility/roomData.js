@@ -81,13 +81,24 @@ const getConsumer = (roomID, username, consumerID) => {
     return rooms.get(roomID).peers[username].consumers.find(data => data.id === consumerID);
 }
 
+const getPeer = (peerID) => {
+    return peersMap.get(peerID);
+}
+
+const deletePeer =(peerID) => {
+    const  peer = peersMap.get(peerID);
+    delete rooms.get(peer.roomID).peers.username;
+    return peersMap.delete(peerID);
+
+}
+
 module.exports = {
     initializeRoom, getRouter, joinPeer2Room,
   addTransports, getSendTransport, getRecvTransport,
   addProducer, 
   addConsumer,
   getConsumer,
-  addToProducerList,
-  getProducerList,
+  addToProducerList, deletePeer,
+  getProducerList,getPeer
 }
 

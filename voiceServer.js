@@ -6,7 +6,7 @@ const { initializeRoom, getRouter, joinPeer2Room,
   addProducer, 
   addConsumer,
   getConsumer,
-  getProducerList,
+  getProducerList, getPeer, deletePeer,
   addToProducerList} = require("./utility/roomData");
 const { logItOnConsole } = require("./utility/logging");
 
@@ -49,7 +49,7 @@ const logTags = [
 const PORT = 3001;
 const WEBRTC_TRANS_PROTOCOL= "tcp";
 const IP = '0.0.0.0';
-const ANNOUNCED_IP = '192.168.144.137';
+const ANNOUNCED_IP = '127.0.0.1';
 const CONNECTION_SUCCESS =  "Connected with Voice server succesfully";
 let worker;
 
@@ -127,25 +127,38 @@ createWebRtcTransport = async (roomID) => {
     socket.emit("connection-success",CONNECTION_SUCCESS);
 
     socket.on("create-voice-room", async ({roomID, username}) => {
+      try {
       let router  = await createRouter();
       initializeRoom(roomID, router);
-      peerID = socket.id + username;
-      joinPeer2Room(roomID, peerID, username);
+      peerID = roomID + username;
+      socket.peerID = peerID;
+      joinPeer2Room(roomID, socket.id, username, peerID);
       socket.join(roomID);
       socket.emit("rtp-capabilities-router", (router.rtpCapabilities));
       logItOnConsole(`[INFO] voice room created [RMID] ${roomID} [USER] ${username}`);
+      }
+      catch (eror) {
+        logItOnConsole(`[CACH] [EROR] create voice room eror [RMID] ${roomID} [USER] ${username}`);
+      }
     });
 
     socket.on("join-voice-room", ({roomID, username}) => {
+      try {
       const router = getRouter(roomID);
-      peerID = socket.id + username;
-      joinPeer2Room(roomID, peerID, username);
+      peerID = username + username;
+      socket.peerID = peerID;
+      joinPeer2Room(roomID,socket.id, username, peerID);
       socket.join(roomID);
       socket.emit("rtp-capabilities-router", (router.rtpCapabilities));
       logItOnConsole(`[INFO] joined voice room [RMID] ${roomID} [USER] ${username}`);
+      }
+      catch (eror) {
+        logItOnConsole(`[CACH] [EROR] join voice room error [RMID] ${roomID} [USER] ${username}`);
+      }
     });
 
     socket.on("create-webrtc-transport", async ({roomID, username}) => {
+      try {
        let transport =  await createWebRtcTransport(roomID);
        let transportConsumer = await createWebRtcTransport(roomID);
        let params = {
@@ -163,21 +176,36 @@ createWebRtcTransport = async (roomID) => {
       addTransports(roomID, username, transport, transportConsumer);
       logItOnConsole(`[INFO] transports created [RMID] ${roomID} [USER] ${username}`);
       socket.emit("transport-params", ({params, paramsConsumer}));
+    }
+    catch (eror) {
+      logItOnConsole(`[CACH] [EROR] transport creation [RMID] ${roomID} [USER] ${username}`);
+    }
     });
 
     socket.on("transport-connect",  async ({ dtlsParameters, roomID, username}) => {
+      try {
       let transport = getSendTransport(roomID, username);
       await transport.connect({dtlsParameters});
       logItOnConsole(`[INFO] [DTLS] producer transport connect [RMID] ${roomID} [USER] ${username}`);
+      }
+      catch (eror) {
+        logItOnConsole(`[CACH] [EROR] transport connect eror [RMID] ${roomID} [USER] ${username}`);
+      }
     });
 
     socket.on("transport-consumer-connect",  async ({ dtlsParameters, roomID, username}) => {
+      try {
       let transport = getRecvTransport(roomID, username);
       await transport.connect({dtlsParameters});
       logItOnConsole(`[INFO] [DTLS] producer transport connect [RMID] ${roomID} [USER] ${username}`);
+      }
+      catch (eror) {
+        logItOnConsole(`[CACH] [EROR] consumer connect [RMID] ${roomID} [USER] ${username}`);
+      }
     });
 
     socket.on("transport-produce", async ({kind, rtpParameters, roomID, username}) => {
+      try {
       transport = getSendTransport(roomID, username);
       producer = await transport.produce({
       kind,
@@ -198,9 +226,14 @@ createWebRtcTransport = async (roomID) => {
       socket.to(roomID).emit("new-producer", (producer.id));
       logItOnConsole(`[INFO] producer list sent [PROD]` + JSON.stringify(producerList) +
        `[RMID] ${roomID} [USER] ${username}`);
+    }
+    catch (eror) {
+      logItOnConsole(`[CACH] [EROR] transport produce erorr [RMID] ${roomID} [USER] ${username}`);
+    }
     });
 
     socket.on("consume",  async ({ rtpCapabilities, roomID, username, producerID}) => {
+      try {
       let router = getRouter(roomID);
       if (router.canConsume({
         producerId: producerID,
@@ -232,20 +265,44 @@ createWebRtcTransport = async (roomID) => {
        socket.emit("consumer-params", (params));
        logItOnConsole(`[INFO] consumer params emited [CONS] ${consumer.id} [PROD] ${producerID} [USER] ${username}`);
       }
+    }
+    catch (eror) {
+      logItOnConsole(`[CACH] [EROR] consume catch [RMID] ${roomID} [USER] ${username}`);
+    }
     });
 
     socket.on('consumer-resume', async ({roomID, username, consumerID}) => {
+      try{
       consumer = getConsumer(roomID, username, consumerID)
       await consumer.resume();
       logItOnConsole(`[INFO] consumer resumed [CONS] ${consumerID} [RMID] ${roomID} [USER] ${username}`);
+      }
+      catch (eror) {
+        logItOnConsole(`[CACH] [EROR] consumer reume eror [RMID] ${roomID} [USER] ${username}`);
+      }
     });
    
     socket.on("disconnect", reason => {
+      try {
+      const peer = getPeer(socket.peerID);
+      peer.sendTransport.close();
+      peer.recvTransport.close();
+      let val = deletePeer(peerID);
+      logItOnConsole("[DELT] PEER DELETED [RVAL] " + val);
       logItOnConsole("[INFO] disconnect [RVAL] " + reason);
+      }
+      catch (eror) {
+        logItOnConsole("[CACH] [EROR] player diconnect catch");
+      }
     });
   });
 
-logItOnConsole("[INFO] Creating worker...");
-worker = createWorker();
-logItOnConsole("[INFO] Listening on port: " + PORT);
-io.listen(PORT);
+try {
+  logItOnConsole("[INFO] Creating worker...");
+  worker = createWorker();
+  logItOnConsole("[INFO] Listening on port: " + PORT);
+  io.listen(PORT);
+}
+catch (error) {
+  logItOnConsole("[EROR] Server initialization failed please restart");
+}
