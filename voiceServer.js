@@ -145,7 +145,7 @@ createWebRtcTransport = async (roomID) => {
     socket.on("join-voice-room", ({roomID, username}) => {
       try {
       const router = getRouter(roomID);
-      peerID = username + username;
+      peerID = roomID + username;
       socket.peerID = peerID;
       joinPeer2Room(roomID,socket.id, username, peerID);
       socket.join(roomID);
@@ -248,14 +248,20 @@ createWebRtcTransport = async (roomID) => {
         logItOnConsole(`[INFO] consumer created [CONS] ${consumer.id} [RMID] ${roomID} [USER] ${username}`);
         addConsumer(roomID, username, consumer);
         consumer.on('transportclose', () => {
-          logItOnConsole('[INFO] transport close from consumer [USER] ',username);
+          logItOnConsole('[INFO] transport close from consumer [USER] ' + username);
         });
         consumer.on('producerclose', () => {
-          logItOnConsole('[INFO] producer of consumer closed [USER] ', username);
+          logItOnConsole('[INFO] producer of consumer closed [USER] ' + username);
         });
         consumer.on("trace", (trace) => {
           logItOnConsole("[INFO] [TRAC] trace data");
         });
+        consumer.on('producerpause', () => {
+          logItOnConsole("[INFO] associated prodcuer paused [CONS] " + consumer.id);
+        });
+        consumer.on('producerresume', () => {
+          logItOnConsole("[INFO] associated prodcuer resyumes [CONS] " + consumer.id);
+        })
         const params = {
           id: consumer.id,
           producerId: producerID,
@@ -273,7 +279,7 @@ createWebRtcTransport = async (roomID) => {
 
     socket.on('consumer-resume', async ({roomID, username, consumerID}) => {
       try{
-      consumer = getConsumer(roomID, username, consumerID)
+      let consumer = getConsumer(roomID, username, consumerID);
       await consumer.resume();
       logItOnConsole(`[INFO] consumer resumed [CONS] ${consumerID} [RMID] ${roomID} [USER] ${username}`);
       }
@@ -281,6 +287,36 @@ createWebRtcTransport = async (roomID) => {
         logItOnConsole(`[CACH] [EROR] consumer reume eror [RMID] ${roomID} [USER] ${username}`);
       }
     });
+
+    socket.on('consumer-pause', async ({roomID, username, consumerID}) => {
+      try {
+        let consumer =  getConsumer(roomID, username, consumerID);
+         await consumer.pause();
+         logItOnConsole(`[INFO] consumer paused [CONS] ${consumerID} [RMID] ${roomID} [USER] ${username}`);
+      }
+      catch(error) {
+        logItOnConsole("[CACH] [EROR] consumer pause error");
+      }
+    })
+
+    socket.on('producer-pause', ({roomID, username, pause}) => {
+     try {
+      logItOnConsole(`[INFO] consumer pause play [PLPS] ${pause} [RMID] ${roomID} [USER] ${username}`)
+      const peer = getPeer(roomID + username);
+      if(pause) {
+      peer.producer.pause();
+      socket.emit('producer-paused',(false));
+      }
+      else {
+        peer.producer.resume();
+        socket.emit('producer-paused',(true));
+      }
+     }
+      catch (error) {
+        logItOnConsole("[CACH] [EROR] prodcuer pause error");
+      }
+
+    })
    
     socket.on("disconnect", reason => {
       try {
