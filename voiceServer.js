@@ -9,11 +9,19 @@ const { initializeRoom, getRouter, joinPeer2Room,
   getProducerList, getPeer, deletePeer,
   addToProducerList} = require("./utility/roomData");
 const { logItOnConsole } = require("./utility/logging");
-
-const io = new Server({ cors: {
+const path = require('path');
+const fs = require('fs');
+const httpServer = require("https").createServer({
+  key: fs.readFileSync(path.join(__dirname, 'cert', 'private.key')),
+  cert: fs.readFileSync(path.join(__dirname, 'cert', 'certificate.crt')),
+  ca:fs.readFileSync(path.join(__dirname, 'cert', 'ca_bundle.crt'))
+});
+const io = new Server(httpServer, {
+  cors: {
     origin: "*",
     methods: ["GET", "POST"]
-  }});
+  }
+});
 
 const mediaCodecs = [
   {
@@ -49,7 +57,11 @@ const logTags = [
 const PORT = 3001;
 const WEBRTC_TRANS_PROTOCOL= "tcp";
 const IP = '0.0.0.0';
-const ANNOUNCED_IP = '127.0.0.1';
+
+let ANNOUNCED_IP = '127.0.0.1';
+if(process.env.MODE === 'prod') {
+  ANNOUNCED_IP = '13.200.208.226'
+}
 const CONNECTION_SUCCESS =  "Connected with Voice server succesfully";
 let worker;
 
@@ -297,7 +309,7 @@ createWebRtcTransport = async (roomID) => {
       catch(error) {
         logItOnConsole("[CACH] [EROR] consumer pause error");
       }
-    })
+    });
 
     socket.on('producer-pause', ({roomID, username, pause}) => {
      try {
@@ -315,8 +327,21 @@ createWebRtcTransport = async (roomID) => {
       catch (error) {
         logItOnConsole("[CACH] [EROR] prodcuer pause error");
       }
+    });
 
-    })
+    socket.on("leave-room",({username}) => {
+      logItOnConsole(`[INFO] player left the room [USER] ${username}`);
+      try {
+        const peer = getPeer(socket.peerID);
+        peer.sendTransport.close();
+        peer.recvTransport.close();
+        let val = deletePeer(peerID);
+        logItOnConsole("[DELT] PEER DELETED [RVAL] " + val);
+      }
+      catch (eror) {
+        logItOnConsole("[CACH] [EROR] player leave room catch");
+      }
+    });
    
     socket.on("disconnect", reason => {
       try {
@@ -336,8 +361,19 @@ createWebRtcTransport = async (roomID) => {
 try {
   logItOnConsole("[INFO] Creating worker...");
   worker = createWorker();
-  logItOnConsole("[INFO] Listening on port: " + PORT);
-  io.listen(PORT);
+  if(process.env.MODE === 'dev') {
+    logItOnConsole("[INFO] Starting [dev] game server .....");
+    io.listen(PORT);
+    logItOnConsole("[INFO] Listening on port: " + PORT);
+  }
+  else if(process.env.MODE === 'prod') {
+    logItOnConsole("[INFO] Starting [prod] game server .....");
+    httpServer.listen(PORT);
+    logItOnConsole("[INFO] Listening on port: " + PORT);
+  }
+  else {
+    console.log("failed to start server");
+  }
 }
 catch (error) {
   logItOnConsole("[EROR] Server initialization failed please restart");
