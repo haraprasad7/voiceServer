@@ -60,7 +60,10 @@ const IP = '0.0.0.0';
 
 let ANNOUNCED_IP = '127.0.0.1';
 if(process.env.MODE === 'prod') {
-  ANNOUNCED_IP = '13.200.208.226'
+  ANNOUNCED_IP = '98.130.37.141'
+}
+if(process.env.MODE === 'prodt') {
+  ANNOUNCED_IP = '98.130.37.141'
 }
 const CONNECTION_SUCCESS =  "Connected with Voice server succesfully";
 let worker;
@@ -361,7 +364,7 @@ createWebRtcTransport = async (roomID) => {
 try {
   logItOnConsole("[INFO] Creating worker...");
   worker = createWorker();
-  if(process.env.MODE === 'dev') {
+  if(process.env.MODE === 'dev' || process.env.MODE === 'prodt') {
     logItOnConsole("[INFO] Starting [dev] game server .....");
     io.listen(PORT);
     logItOnConsole("[INFO] Listening on port: " + PORT);
